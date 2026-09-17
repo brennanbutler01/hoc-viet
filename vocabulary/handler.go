@@ -2,6 +2,8 @@ package vocabulary
 
 import (
 	"context"
+	"errors"
+	"log"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -11,10 +13,9 @@ type Handler struct {
 	service *Service
 }
 
-func NewHandler() *Handler {
-	repo := NewRepository("words.json")
+func NewHandler(repo *Repository) *Handler {
 	service := NewService(repo)
-	
+
 	return &Handler{
 		service: service,
 	}
@@ -26,7 +27,11 @@ func (h *Handler) AddWord(ctx context.Context, input *struct {
 }) (*AddWordResponse, error) {
 	word, err := h.service.AddWord(input.Body)
 	if err != nil {
-		return nil, huma.Error400BadRequest("Invalid word data", err)
+		if errors.Is(err, ErrInvalidWord) {
+			return nil, huma.Error400BadRequest(err.Error())
+		}
+		log.Printf("save vocabulary: %v", err)
+		return nil, huma.Error500InternalServerError("Could not save the word.")
 	}
 
 	return &AddWordResponse{Body: *word}, nil
@@ -38,7 +43,8 @@ func (h *Handler) GetWords(ctx context.Context, input *struct{}) (*struct {
 }, error) {
 	words, err := h.service.GetAllWords()
 	if err != nil {
-		return nil, huma.Error500InternalServerError("Failed to retrieve words", err)
+		log.Printf("read vocabulary: %v", err)
+		return nil, huma.Error500InternalServerError("Could not retrieve vocabulary.")
 	}
 
 	return &struct {
@@ -47,8 +53,8 @@ func (h *Handler) GetWords(ctx context.Context, input *struct{}) (*struct {
 }
 
 // RegisterRoutes registers all vocabulary routes
-func RegisterRoutes(api huma.API) {
-	handler := NewHandler()
+func RegisterRoutes(api huma.API, repository *Repository) {
+	handler := NewHandler(repository)
 
 	huma.Register(api, huma.Operation{
 		OperationID: "add-word",

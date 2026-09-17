@@ -4,78 +4,73 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
+// Share one repository instance per file within this process.
+// File replacement is atomic; multi-process writers require a database or file locking.
 type Repository struct {
 	filename string
-	mutex    *sync.Mutex
+	mutex    sync.Mutex
 }
 
-func NewRepository(filename string) *Repository {
-	return &Repository{
-		filename: filename,
-		mutex:    &sync.Mutex{},
-	}
-}
+func NewRepository(filename string) *Repository { return &Repository{filename: filename} }
 
 func (r *Repository) GetAll() ([]Word, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+	return r.readWords()
+}
 
-	var words []Word
+func (r *Repository) readWords() ([]Word, error) {
+	words := []Word{}
 	data, err := os.ReadFile(r.filename)
-
-	if err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("failed to read words file: %w", err)
+	if os.IsNotExist(err) {
+		return words, nil
 	}
-
-	if err == nil {
-		if err := json.Unmarshal(data, &words); err != nil {
-			return nil, fmt.Errorf("failed to parse words file: %w", err)
-		}
+	if err != nil {
+		return nil, fmt.Errorf("read vocabulary file: %w", err)
 	}
-
+	if err := json.Unmarshal(data, &words); err != nil {
+		return nil, fmt.Errorf("parse vocabulary file: %w", err)
+	}
+	if words == nil {
+		words = []Word{}
+	}
 	return words, nil
 }
 
 func (r *Repository) Save(word Word) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-
-	words, err := r.getAllUnsafe()
+	words, err := r.readWords()
 	if err != nil {
 		return err
 	}
-
-	words = append(words, word)
-
-	data, err := json.MarshalIndent(words, "", "  ")
+	data, err := json.MarshalIndent(append(words, word), "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal words: %w", err)
+		return fmt.Errorf("encode vocabulary: %w", err)
 	}
-
-	if err := os.WriteFile(r.filename, data, 0644); err != nil {
-		return fmt.Errorf("failed to write words file: %w", err)
+	// Stage beside the destination so rename cannot cross filesystem boundaries.
+	file, err := os.CreateTemp(filepath.Dir(r.filename), ".vocabulary-*.json")
+	if err != nil {
+		return fmt.Errorf("create staged vocabulary: %w", err)
 	}
-
+	defer os.Remove(file.Name())
+	if _, err = file.Write(data); err != nil {
+		file.Close()
+		return fmt.Errorf("write staged vocabulary: %w", err)
+	}
+	if err = file.Sync(); err != nil {
+		file.Close()
+		return fmt.Errorf("sync staged vocabulary: %w", err)
+	}
+	if err = file.Close(); err != nil {
+		return fmt.Errorf("close staged vocabulary: %w", err)
+	}
+	if err = os.Rename(file.Name(), r.filename); err != nil {
+		return fmt.Errorf("replace vocabulary file: %w", err)
+	}
 	return nil
-}
-
-// getAllUnsafe is a helper method that doesn't lock (assumes caller has lock)
-func (r *Repository) getAllUnsafe() ([]Word, error) {
-	var words []Word
-	data, err := os.ReadFile(r.filename)
-
-	if err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("failed to read words file: %w", err)
-	}
-
-	if err == nil {
-		if err := json.Unmarshal(data, &words); err != nil {
-			return nil, fmt.Errorf("failed to parse words file: %w", err)
-		}
-	}
-
-	return words, nil
 }

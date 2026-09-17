@@ -1,121 +1,73 @@
-# Translation & Vocabulary API
+# Học Việt: translation and vocabulary API
 
-A REST API for translating words and managing vocabulary collections. Built with Go using the Huma v2 framework.
+A small Go service for translating English words into Vietnamese and saving a personal vocabulary collection. Built with Huma and Chi, with generated OpenAPI documentation.
 
-## Features
+This is a local, single-user project. It has no authentication or multi-user isolation and is not intended to be exposed directly to the internet. The separate Tofu.Vocab portfolio demo is at https://tofu-vocab-demo.vercel.app.
 
-- **Translation Service** - Translate words from English to Vietnamese using the MyMemory API
-- **Vocabulary Management** - Store and retrieve studied words locally
-- **Auto-generated Documentation** - Interactive OpenAPI/Swagger documentation
+## Run locally
 
-## API Documentation
+Requires Go 1.25 or newer. The repository already contains its module definition; do not run `go mod init` again.
 
-### Translation Endpoints
-
-| Method | Endpoint              | Description                                           |
-| ------ | --------------------- | ----------------------------------------------------- |
-| `GET`  | `/translation/{word}` | Get translation for a word from English to Vietnamese |
-
-### Vocabulary Endpoints
-
-| Method | Endpoint | Description                         |
-| ------ | -------- | ----------------------------------- |
-| `POST` | `/words` | Add a new word to your vocabulary   |
-| `GET`  | `/words` | Retrieve all saved vocabulary words |
-
-## Quick Start
-
-### Prerequisites
-
-- Go 1.19 or higher
-- Internet connection for translation services
-
-### Installation and Setup
-
-1. Clone the repository:
-
-```bash
-git clone <your-repo-url>
-cd translation-vocabulary-api
-```
-
-2. Initialize the Go module:
-
-```bash
-go mod init your-project
-go mod tidy
-```
-
-3. Start the server:
-
-```bash
+```sh
+go mod download
 go run .
 ```
 
-The API will be available at `http://localhost:8888`. Interactive documentation can be found at `http://localhost:8888/docs`.
+Open http://127.0.0.1:8888/docs for interactive API documentation.
 
-## Usage Examples
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET | `/translation/{word}` | Translate an English word or short phrase to Vietnamese |
+| POST | `/words` | Save a word and its translation |
+| GET | `/words` | Retrieve the saved vocabulary |
 
-### Translate a Word
-
-```bash
-curl http://localhost:8888/translation/hello
+```sh
+curl http://127.0.0.1:8888/words
+curl -X POST http://127.0.0.1:8888/words \
+  -H 'Content-Type: application/json' \
+  -d '{"word":"hello","translation":"xin chào"}'
+curl http://127.0.0.1:8888/translation/hello
 ```
 
-Response:
+Translation sends the requested text to the public MyMemory service. Availability and quotas depend on that provider. Requests have a ten-second timeout, inherit client cancellation, reject unsuccessful or malformed provider responses, and limit response bodies to one MiB. The test suite uses local HTTP servers and does not contact MyMemory.
 
-```json
-{
-  "responseData": {
-    "translatedText": "xin chào",
-    "match": 1.0
-  },
-  "quotaFinished": false,
-  "responseStatus": 200,
-  "matches": [...]
-}
+## Docker
+
+```sh
+docker build -t hoc-viet:local .
+docker run --rm --name hoc-viet-local -p 127.0.0.1:5195:8888 hoc-viet:local
 ```
 
-### Add Word to Vocabulary
+Open http://127.0.0.1:5195/docs. The container runs as an unprivileged user. Its vocabulary is disposable unless you explicitly mount persistent storage; removing the container deletes its saved words.
 
-```bash
-curl -X POST http://localhost:8888/words \
-  -H "Content-Type: application/json" \
-  -d '{
-    "word": "hello",
-    "translation": "xin chào"
-  }'
+## Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `LISTEN_ADDR` | `127.0.0.1:8888` | Listener address; the Docker image uses `0.0.0.0:8888` internally |
+| `VOCABULARY_FILE` | `words.json` | JSON storage file; the Docker image uses `/data/words.json` |
+
+The vocabulary directory must exist and be writable. One repository instance serializes access within the process. Writes stage a private file beside the destination, sync it, and atomically rename it into place. Existing malformed data is preserved and reported as an error. Multiple processes writing the same file are not supported; use a database if that becomes a requirement.
+
+Vocabulary data, compiled binaries, environment files, and temporary build artifacts are ignored by Git. Do not put personal data or credentials in commits.
+
+## Verify
+
+```sh
+go test -race -count=1 ./...
+go vet ./...
+go build -o /tmp/hoc-viet .
 ```
 
-Response:
+Tests cover query encoding, provider failures and oversized responses, cancellation/timeouts, concurrent saves, persistence, malformed-file preservation, and the real vocabulary HTTP handlers. Storage failures return server errors rather than being mislabeled as invalid user input. Server startup failures are reported, request timeouts are configured, and shutdown drains active requests.
 
-```json
-{
-	"word": "hello",
-	"translation": "xin chào",
-	"dateCreated": "2025-09-17T10:30:00Z"
-}
+Without a local Go installation:
+
+```sh
+docker run --rm -v "$PWD:/src" -w /src golang:1.25 \
+  go test -race -count=1 ./...
 ```
 
-### Get Vocabulary List
+Remaining limitations: no authentication, no request rate limiting, no multi-process storage coordination, no migration to a database, and no verification against the live translation provider. This service is not deployed on Vercel; its file persistence requires a different hosting design before public use.
 
-```bash
-curl http://localhost:8888/words
-```
-
-Response:
-
-```json
-[
-	{
-		"word": "hello",
-		"translation": "xin chào",
-		"dateCreated": "2025-09-17T10:30:00Z"
-	},
-	{
-		"word": "world",
-		"translation": "thế giới",
-		"dateCreated": "2025-09-17T10:35:00Z"
-	}
-]
-```
+Recovery verification (September 17, 2026): all three Go packages passed race-enabled tests; `go vet` and compilation passed. The Docker image built and its running container passed empty-list, save, persisted-read, and documentation checks. The disposable verification container was stopped and removed.

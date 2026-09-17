@@ -1,7 +1,7 @@
 package translation
 
 type Output struct {
-	Body any
+	Body *MyMemoryResponse
 }
 
 type Match struct {

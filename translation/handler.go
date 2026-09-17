@@ -3,6 +3,7 @@ package translation
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -18,11 +19,14 @@ func NewHandler() *Handler {
 }
 
 func (h *Handler) GetTranslation(ctx context.Context, input *struct {
-	Word string `path:"word" maxLength:"30" example:"world" doc:"Word to translate"`
+	Word string `path:"word" minLength:"1" maxLength:"30" example:"world" doc:"Word to translate"`
 }) (*Output, error) {
-	result, err := h.service.Translate(input.Word)
+	if strings.TrimSpace(input.Word) == "" {
+		return nil, huma.Error400BadRequest("A word is required.")
+	}
+	result, err := h.service.Translate(ctx, input.Word)
 	if err != nil {
-		return nil, huma.Error500InternalServerError("Translation failed", err)
+		return nil, huma.Error502BadGateway("Translation provider is unavailable. Please try again later.")
 	}
 
 	return &Output{Body: result}, nil

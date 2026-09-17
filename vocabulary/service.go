@@ -1,9 +1,14 @@
 package vocabulary
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"time"
+	"unicode/utf8"
 )
+
+var ErrInvalidWord = errors.New("invalid word data")
 
 type Service struct {
 	repo *Repository
@@ -17,11 +22,13 @@ func NewService(repo *Repository) *Service {
 
 // AddWord adds a new word to the vocabulary
 func (s *Service) AddWord(request AddWordRequest) (*Word, error) {
-	if request.Word == "" {
-		return nil, fmt.Errorf("word cannot be empty")
+	request.Word = strings.TrimSpace(request.Word)
+	request.Translation = strings.TrimSpace(request.Translation)
+	if request.Word == "" || utf8.RuneCountInString(request.Word) > 200 {
+		return nil, fmt.Errorf("%w: word must contain 1 to 200 characters", ErrInvalidWord)
 	}
-	if request.Translation == "" {
-		return nil, fmt.Errorf("translation cannot be empty")
+	if request.Translation == "" || utf8.RuneCountInString(request.Translation) > 500 {
+		return nil, fmt.Errorf("%w: translation must contain 1 to 500 characters", ErrInvalidWord)
 	}
 
 	word := Word{

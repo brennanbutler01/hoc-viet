@@ -1,0 +1,7 @@
+/tmp/
+/.idea/
+/words.json
+*.test
+/coverage.out
+.env
+.env.*
