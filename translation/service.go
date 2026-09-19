@@ -63,7 +63,7 @@ func (s *Service) Translate(ctx context.Context, word string) (*MyMemoryResponse
 		return nil, fmt.Errorf("decode translation response: %w", err)
 	}
 	if result.ResponseStatus != http.StatusOK || result.QuotaFinished || strings.TrimSpace(result.ResponseData.TranslatedText) == "" {
-		return nil, fmt.Errorf("translation provider did not return a usable translation")
+		return nil, fmt.Errorf("translation provider did not return a usable translation (status=%d, quotaFinished=%t)", result.ResponseStatus, result.QuotaFinished)
 	}
 	return &result, nil
 }
