@@ -2,7 +2,7 @@
 
 A small Go service for translating English words into Vietnamese and saving a vocabulary collection. Built with Huma and Chi, with generated OpenAPI documentation.
 
-[Hosted demo docs](https://hoc-viet-demo.fly.dev/docs) · [Hosted health check](https://hoc-viet-demo.fly.dev/health)
+[Hosted demo docs](https://hoc-viet-demo.vercel.app/docs) · [Hosted health check](https://hoc-viet-demo.vercel.app/health)
 
 The default process is a local, single-user API. It has no authentication or multi-user isolation, so the full write API is not intended to be exposed directly to the internet. The hosted demo runs in an explicit read-only mode and does not accept vocabulary writes. The separate [Tofu.Vocab](https://tofu-vocab-demo.vercel.app) portfolio demo provides the complete study experience.
 
@@ -57,7 +57,7 @@ Vocabulary data, compiled binaries, environment files, and temporary build artif
 
 ## Hosted demo
 
-The public deployment is named `hoc-viet-demo` and runs on Fly.io at [hoc-viet-demo.fly.dev](https://hoc-viet-demo.fly.dev). It sets `PUBLIC_DEMO=true` and exposes the generated [OpenAPI documentation](https://hoc-viet-demo.fly.dev/docs), `/health`, translation requests, and an empty disposable vocabulary read. `POST /words` is disabled with HTTP 405. Translation requests are limited to 60 per running instance per minute. The deployment has no credentials, no personal data, and no persistent vocabulary volume.
+The public deployment is named `hoc-viet-demo` and runs in Brennan’s personal Vercel account (`brennanbutler01s-projects`) at [hoc-viet-demo.vercel.app](https://hoc-viet-demo.vercel.app). It sets `PUBLIC_DEMO=true` and exposes the generated [OpenAPI documentation](https://hoc-viet-demo.vercel.app/docs), `/health`, translation requests, and an empty disposable vocabulary read. `POST /words` is disabled with HTTP 405. Translation requests are limited to 60 per running instance per minute. The deployment has no credentials, no personal data, and no persistent vocabulary volume.
 
 ## Verify
 
@@ -76,6 +76,8 @@ docker run --rm -v "$PWD:/src" -w /src golang:1.25 \
   go test -race -count=1 ./...
 ```
 
-Remaining local-mode limitations: no authentication, no multi-process storage coordination, no migration to a database, and no verification against the live translation provider. The hosted mode is intentionally read-only and should not be treated as a multi-user vocabulary service.
+Remaining local-mode limitations: no authentication, no multi-process storage coordination, no migration to a database, and dependence on the external translation provider. The hosted mode is intentionally read-only and should not be treated as a multi-user vocabulary service.
 
 Recovery verification (September 17, 2026): all three Go packages passed race-enabled tests; `go vet` and compilation passed. The Docker image built and its running container passed empty-list, save, persisted-read, and documentation checks. The disposable verification container was stopped and removed.
+
+Deploy only to the personal Vercel scope using `python3 scripts/deploy_personal.py`. The script rejects any other linked account or project. Company hosting accounts must not be used for this portfolio.

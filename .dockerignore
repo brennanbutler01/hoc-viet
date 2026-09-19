@@ -4,3 +4,4 @@ tmp
 words.json
 .env*
 coverage.out
+.vercel

@@ -1,0 +1,15 @@
+FROM golang:1.25@sha256:699337d620559a59b4a2bb298ad59611e535d2ee755a34cf2d2a98f37578dc80 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY main.go public_demo.go ./
+COPY translation/ ./translation/
+COPY vocabulary/ ./vocabulary/
+RUN CGO_ENABLED=0 go build -trimpath -o /hoc-viet .
+FROM scratch
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=build /hoc-viet /hoc-viet
+USER 65532:65532
+ENV LISTEN_ADDR=0.0.0.0:8080 PUBLIC_DEMO=true VOCABULARY_FILE=/tmp/hoc-viet-words.json
+EXPOSE 8080
+ENTRYPOINT ["/hoc-viet"]
