@@ -26,4 +26,5 @@ with tempfile.TemporaryDirectory(prefix='hoc-viet-personal-') as directory:
     subprocess.run([
         'npm', 'exec', '--yes', '--package=vercel@59.15.0', '--',
         'vercel', 'deploy', '--prod', '--yes', '--scope', 'brennanbutler01s-projects',
+        '--env', 'PORT=8080',
     ], cwd=target, check=True)
