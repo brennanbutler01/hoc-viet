@@ -81,3 +81,9 @@ Remaining local-mode limitations: no authentication, no multi-process storage co
 Recovery verification (September 17, 2026): all three Go packages passed race-enabled tests; `go vet` and compilation passed. The Docker image built and its running container passed empty-list, save, persisted-read, and documentation checks. The disposable verification container was stopped and removed.
 
 Deploy only to the personal Vercel scope using `python3 scripts/deploy_personal.py`. The script rejects any other linked account or project. Company hosting accounts must not be used for this portfolio.
+
+Hosting verification (September 19, 2026): personal Vercel health, docs,
+OpenAPI, and vocabulary reads pass; public writes return 405. MyMemory returned
+HTTP 429 to translation requests from this deployment, surfaced as a 502 by the
+API. Live translation is currently provider-limited; it is not a verified
+working feature of the hosted demo. The previous Fly app has been destroyed.
