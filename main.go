@@ -13,15 +13,40 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
 
 func newRouter(filename string) http.Handler {
+	return newConfiguredRouter(filename, false)
+}
+
+func newPublicDemoRouter(filename string) http.Handler {
+	return newConfiguredRouter(filename, true)
+}
+
+func newConfiguredRouter(filename string, publicDemo bool) http.Handler {
 	router := chi.NewMux()
-	api := humachi.New(router, huma.DefaultConfig("Translation API", "1.0.0"))
+	title := "Học Việt API"
+	if publicDemo {
+		title = "Học Việt Public Demo API"
+	}
+	api := humachi.New(router, huma.DefaultConfig(title, "1.0.0"))
 	translation.RegisterRoutes(api)
-	vocabulary.RegisterRoutes(api, vocabulary.NewRepository(filename))
+	repository := vocabulary.NewRepository(filename)
+	if publicDemo {
+		vocabulary.RegisterReadOnlyRoutes(api, repository)
+	} else {
+		vocabulary.RegisterRoutes(api, repository)
+	}
+	router.Get("/health", func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"status":"ok"}`))
+	})
+	if publicDemo {
+		return newPublicDemoMiddleware(router)
+	}
 	return router
 }
 
@@ -34,13 +59,22 @@ func run() error {
 	if filename == "" {
 		filename = "words.json"
 	}
-	server := &http.Server{Addr: address, Handler: newRouter(filename), ReadHeaderTimeout: 5 * time.Second,
+	publicDemo := strings.EqualFold(os.Getenv("PUBLIC_DEMO"), "true")
+	handler := newRouter(filename)
+	if publicDemo {
+		handler = newPublicDemoRouter(filename)
+	}
+	server := &http.Server{Addr: address, Handler: handler, ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	failures := make(chan error, 1)
 	go func() { failures <- server.ListenAndServe() }()
-	log.Printf("Serving local vocabulary API at %s", address)
+	if publicDemo {
+		log.Printf("Serving Học Việt public demo API at %s", address)
+	} else {
+		log.Printf("Serving Học Việt local API at %s", address)
+	}
 	select {
 	case err := <-failures:
 		if errors.Is(err, http.ErrServerClosed) {

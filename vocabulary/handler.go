@@ -55,6 +55,7 @@ func (h *Handler) GetWords(ctx context.Context, input *struct{}) (*struct {
 // RegisterRoutes registers all vocabulary routes
 func RegisterRoutes(api huma.API, repository *Repository) {
 	handler := NewHandler(repository)
+	registerGetWords(api, handler)
 
 	huma.Register(api, huma.Operation{
 		OperationID: "add-word",
@@ -64,7 +65,13 @@ func RegisterRoutes(api huma.API, repository *Repository) {
 		Description: "Add a new word to your vocabulary collection.",
 		Tags:        []string{"Vocabulary"},
 	}, handler.AddWord)
+}
 
+func RegisterReadOnlyRoutes(api huma.API, repository *Repository) {
+	registerGetWords(api, NewHandler(repository))
+}
+
+func registerGetWords(api huma.API, handler *Handler) {
 	huma.Register(api, huma.Operation{
 		OperationID: "get-words",
 		Method:      http.MethodGet,

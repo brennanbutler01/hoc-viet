@@ -1,8 +1,10 @@
-# Học Việt: translation and vocabulary API
+# Học Việt API
 
-A small Go service for translating English words into Vietnamese and saving a personal vocabulary collection. Built with Huma and Chi, with generated OpenAPI documentation.
+A small Go service for translating English words into Vietnamese and saving a vocabulary collection. Built with Huma and Chi, with generated OpenAPI documentation.
 
-This is a local, single-user project. It has no authentication or multi-user isolation and is not intended to be exposed directly to the internet. The separate Tofu.Vocab portfolio demo is at https://tofu-vocab-demo.vercel.app.
+[Hosted demo docs](https://hoc-viet-demo.fly.dev/docs) · [Hosted health check](https://hoc-viet-demo.fly.dev/health)
+
+The default process is a local, single-user API. It has no authentication or multi-user isolation, so the full write API is not intended to be exposed directly to the internet. The hosted demo runs in an explicit read-only mode and does not accept vocabulary writes. The separate [Tofu.Vocab](https://tofu-vocab-demo.vercel.app) portfolio demo provides the complete study experience.
 
 ## Run locally
 
@@ -17,9 +19,10 @@ Open http://127.0.0.1:8888/docs for interactive API documentation.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
+| GET | `/health` | Report service health |
 | GET | `/translation/{word}` | Translate an English word or short phrase to Vietnamese |
-| POST | `/words` | Save a word and its translation |
-| GET | `/words` | Retrieve the saved vocabulary |
+| POST | `/words` | Save a word and its translation (local mode) |
+| GET | `/words` | Retrieve the saved vocabulary (local mode and hosted demo) |
 
 ```sh
 curl http://127.0.0.1:8888/words
@@ -46,10 +49,15 @@ Open http://127.0.0.1:5195/docs. The container runs as an unprivileged user. Its
 | --- | --- | --- |
 | `LISTEN_ADDR` | `127.0.0.1:8888` | Listener address; the Docker image uses `0.0.0.0:8888` internally |
 | `VOCABULARY_FILE` | `words.json` | JSON storage file; the Docker image uses `/data/words.json` |
+| `PUBLIC_DEMO` | `false` | Expose the hosted read-only surface and its request limit |
 
 The vocabulary directory must exist and be writable. One repository instance serializes access within the process. Writes stage a private file beside the destination, sync it, and atomically rename it into place. Existing malformed data is preserved and reported as an error. Multiple processes writing the same file are not supported; use a database if that becomes a requirement.
 
 Vocabulary data, compiled binaries, environment files, and temporary build artifacts are ignored by Git. Do not put personal data or credentials in commits.
+
+## Hosted demo
+
+The public deployment is named `hoc-viet-demo` and runs on Fly.io at [hoc-viet-demo.fly.dev](https://hoc-viet-demo.fly.dev). It sets `PUBLIC_DEMO=true` and exposes the generated [OpenAPI documentation](https://hoc-viet-demo.fly.dev/docs), `/health`, translation requests, and an empty disposable vocabulary read. `POST /words` is disabled with HTTP 405. Translation requests are limited to 60 per running instance per minute. The deployment has no credentials, no personal data, and no persistent vocabulary volume.
 
 ## Verify
 
@@ -68,6 +76,6 @@ docker run --rm -v "$PWD:/src" -w /src golang:1.25 \
   go test -race -count=1 ./...
 ```
 
-Remaining limitations: no authentication, no request rate limiting, no multi-process storage coordination, no migration to a database, and no verification against the live translation provider. This service is not deployed on Vercel; its file persistence requires a different hosting design before public use.
+Remaining local-mode limitations: no authentication, no multi-process storage coordination, no migration to a database, and no verification against the live translation provider. The hosted mode is intentionally read-only and should not be treated as a multi-user vocabulary service.
 
 Recovery verification (September 17, 2026): all three Go packages passed race-enabled tests; `go vet` and compilation passed. The Docker image built and its running container passed empty-list, save, persisted-read, and documentation checks. The disposable verification container was stopped and removed.

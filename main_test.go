@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestVocabularyHTTPWorkflow(t *testing.T) {
@@ -59,5 +60,42 @@ func TestVocabularyHTTPWorkflow(t *testing.T) {
 	}
 	if response := request("GET", "/docs", ""); response.Code != 200 {
 		t.Fatalf("docs unavailable: %d", response.Code)
+	}
+}
+
+func TestPublicDemoIsReadOnly(t *testing.T) {
+	handler := newPublicDemoRouter(filepath.Join(t.TempDir(), "words.json"))
+	request := func(method, path string) *httptest.ResponseRecorder {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(method, path, nil))
+		return recorder
+	}
+	if response := request(http.MethodGet, "/health"); response.Code != http.StatusOK {
+		t.Fatalf("health check failed: %d", response.Code)
+	}
+	if response := request(http.MethodGet, "/words"); response.Code != http.StatusOK {
+		t.Fatalf("read-only vocabulary endpoint failed: %d", response.Code)
+	}
+	if response := request(http.MethodPost, "/words"); response.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("public demo accepted a write: %d", response.Code)
+	}
+	if response := request(http.MethodGet, "/docs"); response.Code != http.StatusOK {
+		t.Fatalf("public docs unavailable: %d", response.Code)
+	}
+}
+
+func TestPublicDemoLimiter(t *testing.T) {
+	limiter := &publicDemoLimiter{}
+	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	for range publicTranslationRequestsPerMinute {
+		if !limiter.allow(now) {
+			t.Fatal("limiter rejected a request within the window")
+		}
+	}
+	if limiter.allow(now) {
+		t.Fatal("limiter accepted a request over the window limit")
+	}
+	if !limiter.allow(now.Add(time.Minute)) {
+		t.Fatal("limiter did not reset after one minute")
 	}
 }
